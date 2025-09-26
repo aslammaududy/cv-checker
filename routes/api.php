@@ -1,0 +1,23 @@
+<?php
+
+use App\Http\Controllers\MilvusController;
+use App\Http\Controllers\UploadController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
+
+
+Route::post('/upload', UploadController::class);
+
+// Milvus API routes
+Route::prefix('milvus')->group(function () {
+    Route::get('/test-connection', [MilvusController::class, 'testConnection']);
+    Route::get('/collections', [MilvusController::class, 'listCollections']);
+    Route::post('/collections', [MilvusController::class, 'createCollection']);
+    Route::delete('/collections', [MilvusController::class, 'dropCollection']);
+    Route::post('/vectors/insert-sample', [MilvusController::class, 'insertSampleVectors']);
+    Route::post('/vectors/search', [MilvusController::class, 'searchSimilar']);
+});
