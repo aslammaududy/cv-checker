@@ -16,13 +16,14 @@ class EvaluationService
     {
     }
 
-    public function convertPDFToText(Request $request): \Illuminate\Http\JsonResponse|static
+    public function convertPDFToText(Request $request): static
     {
         $cvFile = $request->file('cv');
         $this->cvText = Pdf::getText($cvFile->getPathname());
 
         if (empty(trim($this->cvText))) {
-            return response()->json(['error' => 'Could not extract text from PDF'], 400);
+            Log::error('Could not extract text from PDF', ['file' => $cvFile->getClientOriginalName()]);
+            throw new \Exception("Could not extract text from PDF");
         }
 
         return $this;
