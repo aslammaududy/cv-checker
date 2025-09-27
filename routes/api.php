@@ -16,7 +16,7 @@ Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
 
 Route::post('/upload', UploadController::class)->middleware('auth:sanctum');
-Route::post('/evaluate', [EvaluateController::class, 'evaluate']);
+Route::post('/evaluate', [EvaluateController::class, 'evaluate'])->middleware('auth:sanctum');
 
 // Milvus API routes
 Route::prefix('milvus')->group(function () {

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Evaluation;
+use App\Models\User;
 use Gemini\Laravel\Facades\Gemini;
 use HelgeSverre\Milvus\Facades\Milvus;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ use Spatie\PdfToText\Pdf;
 class EvaluationService
 {
     private string $cvText;
+    private User $user;
 
     public function __construct()
     {
@@ -20,10 +22,12 @@ class EvaluationService
 
     public function convertPDFToText(Evaluation $evaluation): static
     {
-        $this->cvText = Pdf::getText(storage_path('app/private/uploads/cv/forjob.aslam@gmail.com_cv.pdf'));
+        $this->cvText = Pdf::getText(storage_path("app/private/{$evaluation->cv}"));
+
+        $this->user = $evaluation->user;
 
         if (empty(trim($this->cvText))) {
-            Log::error('Could not extract text from PDF', ['file' => 'forjob.aslam@gmail.com_cv.pdf']);
+            Log::error('Could not extract text from PDF', ['file' => "{$this->user->email}_cv.pdf"]);
             throw new \Exception("Could not extract text from PDF");
         }
 
@@ -46,7 +50,8 @@ class EvaluationService
 
             $embeddings[] = [
                 'vector' => $response->embedding->values,
-                'content' => $chunk
+                'content' => $chunk,
+                'user_id' => $this->user->email,
             ];
         }
 
