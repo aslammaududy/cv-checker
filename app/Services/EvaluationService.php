@@ -14,6 +14,7 @@ use Spatie\PdfToText\Pdf;
 class EvaluationService
 {
     private string $cvText;
+    private string $projectText;
     private User $user;
 
     public function __construct()
@@ -23,12 +24,18 @@ class EvaluationService
     public function convertPDFToText(Evaluation $evaluation): static
     {
         $this->cvText = Pdf::getText(storage_path("app/private/{$evaluation->cv}"));
+        $this->projectText = Pdf::getText(storage_path("app/private/{$evaluation->project}"));
 
         $this->user = $evaluation->user;
 
         if (empty(trim($this->cvText))) {
             Log::error('Could not extract text from PDF', ['file' => "{$this->user->email}_cv.pdf"]);
-            throw new \Exception("Could not extract text from PDF");
+            throw new \Exception("Could not extract text from PDF (CV)");
+        }
+
+        if (empty(trim($this->projectText))) {
+            Log::error('Could not extract text from PDF', ['file' => "{$this->user->email}_project.pdf"]);
+            throw new \Exception("Could not extract text from PDF (Project)");
         }
 
         return $this;
@@ -39,8 +46,9 @@ class EvaluationService
         $this->ensureCollectionExists();
 
         $cvChunks = $this->chunkText($this->cvText);
+        $projectChunks = $this->chunkText($this->projectText);
 
-        $embeddings = [];
+        $cvEmbeddings = [];
 
         foreach ($cvChunks as $index => $chunk) {
             if (empty(trim($chunk))) continue;
@@ -48,7 +56,22 @@ class EvaluationService
             $response = Gemini::embeddingModel('gemini-embedding-001')
                 ->embedContent($chunk);
 
-            $embeddings[] = [
+            $cvEmbeddings[] = [
+                'vector' => $response->embedding->values,
+                'content' => $chunk,
+                'user_id' => $this->user->email,
+            ];
+        }
+
+        $projectEmbeddings = [];
+
+        foreach ($projectChunks as $index => $chunk) {
+            if (empty(trim($chunk))) continue;
+
+            $response = Gemini::embeddingModel('gemini-embedding-001')
+                ->embedContent($chunk);
+
+            $projectEmbeddings[] = [
                 'vector' => $response->embedding->values,
                 'content' => $chunk,
                 'user_id' => $this->user->email,
@@ -56,10 +79,17 @@ class EvaluationService
         }
 
         // Batch insert all vectors
-        if (!empty($embeddings)) {
+        if (!empty($cvEmbeddings)) {
             Milvus::vector()->insert(
                 collectionName: 'cv',
-                data: $embeddings
+                data: $cvEmbeddings
+            );
+        }
+
+        if (!empty($projectEmbeddings)) {
+            Milvus::vector()->insert(
+                collectionName: 'project',
+                data: $projectEmbeddings
             );
         }
     }
@@ -80,6 +110,10 @@ class EvaluationService
 
             if (!in_array('cv', $collectionNames)) {
                 Milvus::collections()->create(collectionName: 'cv', dimension: 3072);
+            }
+
+            if (!in_array('project', $collectionNames)) {
+                Milvus::collections()->create(collectionName: 'project', dimension: 3072);
             }
         } catch (\Exception $e) {
             Log::error('Failed to ensure collection exists', ['error' => $e->getMessage()]);
