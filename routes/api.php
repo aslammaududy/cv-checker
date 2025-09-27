@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EvaluateController;
 use App\Http\Controllers\MilvusController;
 use App\Http\Controllers\UploadController;
@@ -10,6 +11,9 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+
+Route::post('register', [AuthController::class, 'register']);
+Route::post('login', [AuthController::class, 'login']);
 
 Route::post('/upload', UploadController::class);
 Route::post('/evaluate', [EvaluateController::class, 'evaluate']);
