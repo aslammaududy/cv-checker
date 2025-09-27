@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Evaluation;
 use App\Services\EvaluationService;
 use Gemini\Laravel\Facades\Gemini;
 use HelgeSverre\Milvus\Facades\Milvus;
@@ -21,6 +22,13 @@ class UploadController extends Controller
 
         $request->file('cv')->storeAs('uploads/cv', "{$request->email}_cv.pdf");
         $request->file('project')->storeAs('uploads/projects', "{$request->email}_project.pdf");
+
+        Evaluation::create([
+            'email' => $request->email,
+            'cv' => "uploads/cv/{$request->email}_cv.pdf",
+            'project' => "uploads/projects/{$request->email}_project.pdf",
+            'status' => "uploaded",
+        ]);
 
         return response()->json(['message' => 'Files uploaded successfully']);
     }
