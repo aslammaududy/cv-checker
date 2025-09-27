@@ -12,7 +12,6 @@
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
-        "pgvector/pgvector": "^0.2.2",
         "spatie/pdf-to-text": "^1.54"
     },
     "require-dev": {
