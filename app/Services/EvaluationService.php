@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Evaluation;
 use Gemini\Laravel\Facades\Gemini;
 use HelgeSverre\Milvus\Facades\Milvus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Spatie\PdfToText\Pdf;
 
 class EvaluationService
@@ -16,13 +18,12 @@ class EvaluationService
     {
     }
 
-    public function convertPDFToText(Request $request): static
+    public function convertPDFToText(Evaluation $evaluation): static
     {
-        $cvFile = $request->file('cv');
-        $this->cvText = Pdf::getText($cvFile->getPathname());
+        $this->cvText = Pdf::getText(storage_path('app/private/uploads/cv/forjob.aslam@gmail.com_cv.pdf'));
 
         if (empty(trim($this->cvText))) {
-            Log::error('Could not extract text from PDF', ['file' => $cvFile->getClientOriginalName()]);
+            Log::error('Could not extract text from PDF', ['file' => 'forjob.aslam@gmail.com_cv.pdf']);
             throw new \Exception("Could not extract text from PDF");
         }
 

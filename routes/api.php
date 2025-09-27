@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EvaluateController;
 use App\Http\Controllers\MilvusController;
 use App\Http\Controllers\UploadController;
 use Illuminate\Http\Request;
@@ -11,6 +12,7 @@ Route::get('/user', function (Request $request) {
 
 
 Route::post('/upload', UploadController::class);
+Route::post('/evaluate', [EvaluateController::class, 'evaluate']);
 
 // Milvus API routes
 Route::prefix('milvus')->group(function () {
