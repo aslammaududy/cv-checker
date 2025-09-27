@@ -15,18 +15,19 @@ class UploadController extends Controller
     public function __invoke(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
             'cv' => 'required|file|mimes:pdf|max:1024',
             'project' => 'required|file|mimes:pdf|max:1024',
         ]);
 
-        $request->file('cv')->storeAs('uploads/cv', "{$request->email}_cv.pdf");
-        $request->file('project')->storeAs('uploads/projects', "{$request->email}_project.pdf");
+        $user_email = $request->user()->email;
+
+        $request->file('cv')->storeAs('uploads/cv', "{$user_email}_cv.pdf");
+        $request->file('project')->storeAs('uploads/projects', "{$user_email}_project.pdf");
 
         Evaluation::create([
-            'email' => $request->email,
-            'cv' => "uploads/cv/{$request->email}_cv.pdf",
-            'project' => "uploads/projects/{$request->email}_project.pdf",
+            'user_id' => auth()->user()->id,
+            'cv' => "uploads/cv/{$user_email}_cv.pdf",
+            'project' => "uploads/projects/{$user_email}_project.pdf",
             'status' => "uploaded",
         ]);
 
