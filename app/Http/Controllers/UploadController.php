@@ -11,21 +11,18 @@ use Spatie\PdfToText\Pdf;
 
 class UploadController extends Controller
 {
-    public function __invoke(Request $request, EvaluationService $service)
+    public function __invoke(Request $request)
     {
         $request->validate([
-            'cv' => 'required|file|mimes:pdf|max:2048', // 2MB max
+            'email' => 'required|email',
+            'cv' => 'required|file|mimes:pdf|max:1024',
+            'project' => 'required|file|mimes:pdf|max:1024',
         ]);
 
-        try {
-            $service->convertPDFToText($request)->evaluate();
+        $request->file('cv')->storeAs('uploads/cv', "{$request->email}_cv.pdf");
+        $request->file('project')->storeAs('uploads/projects', "{$request->email}_project.pdf");
 
-            return response()->json(['message' => 'CV processed successfully']);
-
-        } catch (\Exception $e) {
-            Log::error('CV upload failed', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Failed to process CV', 'error' => $e->getMessage()], 500);
-        }
+        return response()->json(['message' => 'Files uploaded successfully']);
     }
 
 
