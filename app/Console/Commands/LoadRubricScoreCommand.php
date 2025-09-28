@@ -66,17 +66,17 @@ class LoadRubricScoreCommand extends Command
     {
         return [
             // CV Match (untuk referensi retrieval/penilaian)
-            ['category' => 'Technical Skills Match', 'description' => 'Alignment with backend, databases, APIs, cloud, and any AI/LLM exposure.', 'weight' => 40, 'group' => 'cv'],
-            ['category' => 'Experience Level', 'description' => 'Years and complexity of projects delivered; track record and impact.', 'weight' => 25, 'group' => 'cv'],
-            ['category' => 'Relevant Achievements', 'description' => 'Measurable outcomes like scaling, performance, adoption, reliability.', 'weight' => 20, 'group' => 'cv'],
-            ['category' => 'Cultural / Collaboration Fit', 'description' => 'Communication, learning mindset, teamwork/leadership.', 'weight' => 15, 'group' => 'cv'],
+            ['category' => 'Technical Skills Match', 'description' => 'Alignment with backend, databases, APIs, cloud, and any AI/LLM exposure.', 'weight' => 0.4, 'group' => 'cv'],
+            ['category' => 'Experience Level', 'description' => 'Years and complexity of projects delivered; track record and impact.', 'weight' => 0.25, 'group' => 'cv'],
+            ['category' => 'Relevant Achievements', 'description' => 'Measurable outcomes like scaling, performance, adoption, reliability.', 'weight' => 0.2, 'group' => 'cv'],
+            ['category' => 'Cultural / Collaboration Fit', 'description' => 'Communication, learning mindset, teamwork/leadership.', 'weight' => 0.15, 'group' => 'cv'],
 
             // Project Deliverables
-            ['category' => 'Correctness (Prompt & Chaining)', 'description' => 'Implements prompt design, LLM chaining, and RAG context injection correctly.', 'weight' => 30, 'group' => 'project'],
-            ['category' => 'Code Quality & Structure', 'description' => 'Clean, modular, reusable, tested code and sensible structure.', 'weight' => 25, 'group' => 'project'],
-            ['category' => 'Resilience & Error Handling', 'description' => 'Handles long jobs, retries/backoff, timeouts, and LLM randomness.', 'weight' => 20, 'group' => 'project'],
-            ['category' => 'Documentation & Explanation', 'description' => 'Clear README, setup, and trade-off explanations; testing notes.', 'weight' => 15, 'group' => 'project'],
-            ['category' => 'Creativity / Bonus', 'description' => 'Useful extras beyond requirements (auth, deployment, dashboards, etc.).', 'weight' => 10, 'group' => 'project'],
+            ['category' => 'Correctness (Prompt & Chaining)', 'description' => 'Implements prompt design, LLM chaining, and RAG context injection correctly.', 'weight' => 0.3, 'group' => 'project'],
+            ['category' => 'Code Quality & Structure', 'description' => 'Clean, modular, reusable, tested code and sensible structure.', 'weight' => 0.25, 'group' => 'project'],
+            ['category' => 'Resilience & Error Handling', 'description' => 'Handles long jobs, retries/backoff, timeouts, and LLM randomness.', 'weight' => 0.2, 'group' => 'project'],
+            ['category' => 'Documentation & Explanation', 'description' => 'Clear README, setup, and trade-off explanations; testing notes.', 'weight' => 0.15, 'group' => 'project'],
+            ['category' => 'Creativity / Bonus', 'description' => 'Useful extras beyond requirements (auth, deployment, dashboards, etc.).', 'weight' => 0.1, 'group' => 'project'],
         ];
     }
 }
