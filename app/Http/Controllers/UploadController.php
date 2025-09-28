@@ -24,12 +24,16 @@ class UploadController extends Controller
         $request->file('cv')->storeAs('uploads/cv', "{$user_email}_cv.pdf");
         $request->file('project')->storeAs('uploads/projects', "{$user_email}_project.pdf");
 
-        Evaluation::create([
-            'user_id' => auth()->user()->id,
-            'cv' => "uploads/cv/{$user_email}_cv.pdf",
-            'project' => "uploads/projects/{$user_email}_project.pdf",
-            'status' => "uploaded",
-        ]);
+        $evaluation = Evaluation::where('user_id', auth()->user()->id)->first();
+
+        if (!$evaluation) {
+            Evaluation::create([
+                'user_id' => auth()->user()->id,
+                'cv' => "uploads/cv/{$user_email}_cv.pdf",
+                'project' => "uploads/projects/{$user_email}_project.pdf",
+                'status' => "uploaded",
+            ]);
+        }
 
         return response()->json(['message' => 'Files uploaded successfully']);
     }
