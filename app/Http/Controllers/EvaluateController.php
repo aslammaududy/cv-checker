@@ -4,13 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Jobs\EvaluateCvProjectJob;
 use App\Models\Evaluation;
+use App\Services\EvaluationService;
 use Illuminate\Http\Request;
 
 class EvaluateController extends Controller
 {
-    public function evaluate()
+    public function evaluate(EvaluationService $service)
     {
         $evaluation = Evaluation::where('user_id', request()->user()->id)->firstOrFail();
+
+        try {
+            $service->convertPDFToText($evaluation);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()]);
+        }
 
         EvaluateCvProjectJob::dispatch($evaluation);
 
