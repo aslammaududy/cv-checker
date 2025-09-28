@@ -14,6 +14,7 @@ class EvaluateCvProjectJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $timeout = 120;
     public int $tries = 3; // retry 3 times
     public int $backoff = 5; // wait for 5 seconds before retries
 
@@ -26,13 +27,12 @@ class EvaluateCvProjectJob implements ShouldQueue
         $this->evaluation->status = "processing";
         $this->evaluation->save();
 
-        try {
-            $service->convertPDFToText($this->evaluation)->evaluate();
-        } catch (\Exception $exception) {
-            $this->evaluation->status = "failed";
-            $this->evaluation->save();
+        $service->convertPDFToText($this->evaluation)->evaluate();
+    }
 
-            $this->fail($exception);
-        }
+    public function failed(\Throwable $exception)
+    {
+        $this->evaluation->status = "failed";
+        $this->evaluation->save();
     }
 }
