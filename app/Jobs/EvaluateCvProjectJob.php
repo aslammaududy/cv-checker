@@ -23,6 +23,9 @@ class EvaluateCvProjectJob implements ShouldQueue
 
     public function handle(EvaluationService $service): void
     {
+        $this->evaluation->status = "processing";
+        $this->evaluation->save();
+
         try {
             $service->convertPDFToText($this->evaluation)->evaluate();
         } catch (\Exception $exception) {

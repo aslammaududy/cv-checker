@@ -8,10 +8,7 @@ use Gemini\Data\GenerationConfig;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
 use HelgeSverre\Milvus\Facades\Milvus;
-use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Spatie\PdfToText\Pdf;
 
 class EvaluationService
@@ -78,13 +75,18 @@ class EvaluationService
                 "From the provided json please generate the result as the following json output:
                 {
                     'cv_match_rate': {rate},
-                    'cv_feedback': {feedback},
+                    'cv_feedback': {
+                    'Technical Skills Match' : {skill},
+                    'Experience Level' : {experience},
+                    'Relevant Achievements' : {achievements}
+                    'Cultural / Collaboration Fit': {collaboration}
+                    }
                     'overall_summary': {summary},
                 }
                 replace the curly braces with your answer. for the scoring use the following formula:
-                CV Match Rate: your generated score times 0.2 and round it to 2 floating point.
-                and make overall summary as: return 3–5 sentences (strengths, gaps, recommendations).
-
+                cv_match_rate: your generated score times 0.2 and round it to 2 floating point.
+                For the cv_feedback replace {skill}, {experience}, {achievements}, {collaboration} with short and concise sentences.
+                For overall_summary replace {summary} with 3–5 sentences (strengths, gaps, recommendations).
                 " .
                 json_encode($prompt)
             );
@@ -119,7 +121,7 @@ class EvaluationService
             $cvEmbeddings[] = [
                 'vector' => $response->embedding->values,
                 'content' => $chunk,
-                'user_id' => $this->user->email,
+                'user_id' => $this->user->id,
             ];
         }
 
