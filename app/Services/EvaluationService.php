@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Evaluation;
 use App\Models\User;
+use Gemini\Data\GenerationConfig;
+use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
 use HelgeSverre\Milvus\Facades\Milvus;
 use Illuminate\Http\Request;
@@ -18,6 +20,8 @@ class EvaluationService
     private string $projectText;
     private User $user;
 
+    private Evaluation $evaluation;
+
     public function __construct()
     {
     }
@@ -27,6 +31,7 @@ class EvaluationService
         $this->cvText = Pdf::getText(storage_path("app/private/{$evaluation->cv}"));
         $this->projectText = Pdf::getText(storage_path("app/private/{$evaluation->project}"));
 
+        $this->evaluation = $evaluation;
         $this->user = $evaluation->user;
 
         if (empty(trim($this->cvText))) {
@@ -46,69 +51,62 @@ class EvaluationService
     {
         $this->ensureCollectionExists();
 
-//        [$cvEmbed, $projectEmbed] = $this->embedCvAndProject();
-//
-//        $this->vectorize($cvEmbed, $projectEmbed);
+        $this->embedCvAndProject();
 
-        $response = Milvus::vector()->query(
-            collectionName: 'cv',
-            filter: "user_id == {$this->user->id}",
-            outputFields: ["user_id", "content", "vector"]
-        );
-
-        $cvVector = array_column($response->array('data'), 'vector');
-
-        foreach ($cvVector as $vector) {
-            $resjd = Milvus::vector()->search(
-                collectionName: 'jobdesc',
-                vector: $vector,
-                outputFields: ["description"]
-            );
-
-            //get the top 3. because milvus use L2 as default index
-            $jobdesc[] = array_column(array_slice($resjd->array('data'), 0, 3), 'description');
-        }
+        $jobdesc = $this->findJobDescFromCV();
 
         $rubric = Milvus::vector()->query(
             collectionName: 'rubric',
             filter: "group == 'cv'",
-            outputFields: ["category", "description", "weight", "vector"]
+            outputFields: ["category", "description", "weight", "vector", "guide"]
         );
 
         $rubricData = $rubric->array('data');
 
-        foreach ($rubricData as $data) {
-            $cv = Milvus::vector()->search(
-                collectionName: 'cv',
-                vector: $data['vector'],
-                outputFields: ["user_id", "content", "vector"]
-            );
+        $filteredCv = $this->filterCVBasedOnRubricScore($rubricData);
 
-            $filteredCv[$data['category']] = array_slice($cv->array('data'), 0, 3);
-        }
-
-        $prompt = [
-            'jd_context' => $jobdesc,
-            'params' => array_map(function ($item) use ($filteredCv) {
-                return [
-                    'parameter' => $item['category'],
-                    'rubric_desc' => $item['description'],
-                    'cv_snippets' => array_map(fn($i) => $i['content'], $filteredCv[$item['category']]),
-                    'scale' => 'Score 1–5 + short reason'
-                ];
-            }, $rubricData)
-        ];
+        $prompt = $this->generatePromptForScoring($rubricData, $jobdesc, $filteredCv);
 
         $cvScore = Gemini::generativeModel('gemini-2.5-flash')
-            ->generateContent(json_encode($prompt));
+            ->withGenerationConfig(
+                new GenerationConfig(
+                    temperature: 0.1,
+                    responseMimeType: ResponseMimeType::APPLICATION_JSON
+                )
+            )
+            ->generateContent(
+                "From the provided json please generate the result as the following json output:
+                {
+                    'cv_match_rate': {rate},
+                    'cv_feedback': {feedback},
+                    'overall_summary': {summary},
+                }
+                replace the curly braces with your answer. for the scoring use the following formula:
+                CV Match Rate: your generated score times 0.2 and round it to 2 floating point.
+                and make overall summary as: return 3–5 sentences (strengths, gaps, recommendations).
 
-        dd($cvScore->text());
+                " .
+                json_encode($prompt)
+            );
+
+        $this->evaluation->result = json_encode($cvScore->json());
+        $this->evaluation->status = 'completed';
+        $this->evaluation->save();
     }
 
     private function embedCvAndProject()
     {
+        $user_cv = Milvus::vector()->query(
+            collectionName: 'cv',
+            filter: "user_id == {$this->user->id}",
+        );
+
+        if (!empty($user_cv->array('data'))) {
+            return;
+        }
+
         $cvChunks = $this->chunkText($this->cvText);
-        $projectChunks = $this->chunkText($this->projectText);
+//        $projectChunks = $this->chunkText($this->projectText);
 
         $cvEmbeddings = [];
 
@@ -125,25 +123,25 @@ class EvaluationService
             ];
         }
 
-        $projectEmbeddings = [];
+//        $projectEmbeddings = [];
+//
+//        foreach ($projectChunks as $index => $chunk) {
+//            if (empty(trim($chunk))) continue;
+//
+//            $response = Gemini::embeddingModel('gemini-embedding-001')
+//                ->embedContent($chunk);
+//
+//            $projectEmbeddings[] = [
+//                'vector' => $response->embedding->values,
+//                'content' => $chunk,
+//                'user_id' => $this->user->id,
+//            ];
+//        }
 
-        foreach ($projectChunks as $index => $chunk) {
-            if (empty(trim($chunk))) continue;
-
-            $response = Gemini::embeddingModel('gemini-embedding-001')
-                ->embedContent($chunk);
-
-            $projectEmbeddings[] = [
-                'vector' => $response->embedding->values,
-                'content' => $chunk,
-                'user_id' => $this->user->id,
-            ];
-        }
-
-        return ['cvEmbed' => $cvEmbeddings, 'projectEmbed' => $projectEmbeddings];
+        $this->vectorize($cvEmbeddings);
     }
 
-    private function vectorize($cvEmbed, $projectEmbed)
+    private function vectorize($cvEmbed)
     {
         // Batch insert all vectors
         if (!empty($cvEmbed)) {
@@ -153,12 +151,12 @@ class EvaluationService
             );
         }
 
-        if (!empty($projectEmbed)) {
-            Milvus::vector()->insert(
-                collectionName: 'project',
-                data: $projectEmbed
-            );
-        }
+//        if (!empty($projectEmbed)) {
+//            Milvus::vector()->insert(
+//                collectionName: 'project',
+//                data: $projectEmbed
+//            );
+//        }
     }
 
     private function chunkText(string $text, int $chunkSize = 800): array
@@ -186,5 +184,64 @@ class EvaluationService
             Log::error('Failed to ensure collection exists', ['error' => $e->getMessage()]);
             throw $e;
         }
+    }
+
+    private function findJobDescFromCV(): array
+    {
+        $jobdesc = [];
+
+        $response = Milvus::vector()->query(
+            collectionName: 'cv',
+            filter: "user_id == {$this->user->id}",
+            outputFields: ["user_id", "content", "vector"]
+        );
+
+        $cvVector = array_column($response->array('data'), 'vector');
+
+        foreach ($cvVector as $vector) {
+            $resjd = Milvus::vector()->search(
+                collectionName: 'jobdesc',
+                vector: $vector,
+                outputFields: ["description"]
+            );
+
+            //get the top 3. because milvus use L2 as default index
+            $jobdesc[] = array_column(array_slice($resjd->array('data'), 0, 3), 'description');
+        }
+
+        return $jobdesc;
+    }
+
+    private function filterCVBasedOnRubricScore(array $rubricData): array
+    {
+        $filteredCv = [];
+        foreach ($rubricData as $data) {
+            $cv = Milvus::vector()->search(
+                collectionName: 'cv',
+                vector: $data['vector'],
+                outputFields: ["user_id", "content", "vector"]
+            );
+
+            $filteredCv[$data['category']] = array_slice($cv->array('data'), 0, 3);
+        }
+
+        return $filteredCv;
+    }
+
+    private function generatePromptForScoring(array $rubricData, array $jobdesc, array $filteredCv): array
+    {
+        return [
+            'jd_context' => $jobdesc,
+            'params' => array_map(function ($item) use ($filteredCv) {
+                return [
+                    'parameter' => $item['category'],
+                    'weight' => $item['weight'],
+                    'rubric_desc' => $item['description'],
+                    'guide' => $item['guide'],
+                    'cv_snippets' => array_map(fn($i) => $i['content'], $filteredCv[$item['category']]),
+                    'scale' => 'Score 1–5 using guide times weight'
+                ];
+            }, $rubricData)
+        ];
     }
 }
