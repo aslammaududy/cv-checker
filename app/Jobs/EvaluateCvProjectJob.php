@@ -29,6 +29,9 @@ class EvaluateCvProjectJob implements ShouldQueue
         try {
             $service->convertPDFToText($this->evaluation)->evaluate();
         } catch (\Exception $exception) {
+            $this->evaluation->status = "failed";
+            $this->evaluation->save();
+
             $this->fail($exception);
         }
     }

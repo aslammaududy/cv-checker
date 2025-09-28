@@ -41,6 +41,14 @@ class EvaluateController extends Controller
             ]);
         }
 
+        if ($evaluation->status == 'failed') {
+            return response()->json([
+                'id' => $evaluation->id,
+                'status' => $evaluation->status,
+                'message' => "Failed to evaluate the files. Please re run the evaluation."
+            ]);
+        }
+
         return response()->json([
             'id' => $evaluation->id,
             'status' => $evaluation->status,
