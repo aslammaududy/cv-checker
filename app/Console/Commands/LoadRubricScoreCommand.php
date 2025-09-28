@@ -37,6 +37,7 @@ class LoadRubricScoreCommand extends Command
                     'description' => $r['description'],
                     'weight' => $r['weight'],
                     'group' => $r['group'],
+                    'guide' => $r['guide'],
                 ]
             );
 
@@ -66,17 +67,71 @@ class LoadRubricScoreCommand extends Command
     {
         return [
             // CV Match (untuk referensi retrieval/penilaian)
-            ['category' => 'Technical Skills Match', 'description' => 'Alignment with backend, databases, APIs, cloud, and any AI/LLM exposure.', 'weight' => 0.4, 'group' => 'cv'],
-            ['category' => 'Experience Level', 'description' => 'Years and complexity of projects delivered; track record and impact.', 'weight' => 0.25, 'group' => 'cv'],
-            ['category' => 'Relevant Achievements', 'description' => 'Measurable outcomes like scaling, performance, adoption, reliability.', 'weight' => 0.2, 'group' => 'cv'],
-            ['category' => 'Cultural / Collaboration Fit', 'description' => 'Communication, learning mindset, teamwork/leadership.', 'weight' => 0.15, 'group' => 'cv'],
+            [
+                'category' => 'Technical Skills Match',
+                'description' => 'Alignment with backend, databases, APIs, cloud, and any AI/LLM exposure.',
+                'weight' => 0.4,
+                'group' => 'cv',
+                'guide' => '1 = Irrelevant skills, 2 = Few overlaps, 3 = Partial match, 4 = Strong match, 5 = Excellent match + AI/LLM exposure'
+            ],
+            [
+                'category' => 'Experience Level',
+                'description' => 'Years and complexity of projects delivered; track record and impact.',
+                'weight' => 0.25,
+                'group' => 'cv',
+                'guide' => '1 = <1 yr / trivial projects, 2 = 1–2 yrs, 3 = 2–3 yrs with mid-scale projects, 4 = 3–4 yrs solid track record, 5 = 5+ yrs / high-impact projects'
+            ],
+            [
+                'category' => 'Relevant Achievements',
+                'description' => 'Measurable outcomes like scaling, performance, adoption, reliability.',
+                'weight' => 0.2,
+                'group' => 'cv',
+                'guide' => '1 = No clear achievements, 2 = Minimal improvements, 3 = Some measurable outcomes, 4 = Significant contributions, 5 = Major measurable impact'
+            ],
+            [
+                'category' => 'Cultural / Collaboration Fit',
+                'description' => 'Communication, learning mindset, teamwork/leadership.',
+                'weight' => 0.15,
+                'group' => 'cv',
+                'guide' => '1 = Not demonstrated, 2 = Minimal, 3 = Average, 4 = Good, 5 = Excellent and well-demonstrated'
+            ],
 
             // Project Deliverables
-            ['category' => 'Correctness (Prompt & Chaining)', 'description' => 'Implements prompt design, LLM chaining, and RAG context injection correctly.', 'weight' => 0.3, 'group' => 'project'],
-            ['category' => 'Code Quality & Structure', 'description' => 'Clean, modular, reusable, tested code and sensible structure.', 'weight' => 0.25, 'group' => 'project'],
-            ['category' => 'Resilience & Error Handling', 'description' => 'Handles long jobs, retries/backoff, timeouts, and LLM randomness.', 'weight' => 0.2, 'group' => 'project'],
-            ['category' => 'Documentation & Explanation', 'description' => 'Clear README, setup, and trade-off explanations; testing notes.', 'weight' => 0.15, 'group' => 'project'],
-            ['category' => 'Creativity / Bonus', 'description' => 'Useful extras beyond requirements (auth, deployment, dashboards, etc.).', 'weight' => 0.1, 'group' => 'project'],
+            [
+                'category' => 'Correctness (Prompt & Chaining)',
+                'description' => 'Implements prompt design, LLM chaining, and RAG context injection correctly.',
+                'weight' => 0.3,
+                'group' => 'project',
+                'guide' => '1 = Not implemented, 2 = Minimal attempt, 3 = Works partially, 4 = Works correctly, 5 = Fully correct + thoughtful'
+            ],
+            [
+                'category' => 'Code Quality & Structure',
+                'description' => 'Clean, modular, reusable, tested code and sensible structure.',
+                'weight' => 0.25,
+                'group' => 'project',
+                'guide' => '1 = Poor, 2 = Some structure, 3 = Decent modularity, 4 = Good structure + some tests, 5 = Excellent quality + strong tests'
+            ],
+            [
+                'category' => 'Resilience & Error Handling',
+                'description' => 'Handles long jobs, retries/backoff, timeouts, and LLM randomness.',
+                'weight' => 0.2,
+                'group' => 'project',
+                'guide' => '1 = Missing, 2 = Minimal, 3 = Partial handling, 4 = Solid handling, 5 = Robust, production-ready'
+            ],
+            [
+                'category' => 'Documentation & Explanation',
+                'description' => 'Clear README, setup, and trade-off explanations; testing notes.',
+                'weight' => 0.15,
+                'group' => 'project',
+                'guide' => '1 = Missing, 2 = Minimal, 3 = Adequate, 4 = Clear, 5 = Excellent + insightful'
+            ],
+            [
+                'category' => 'Creativity / Bonus',
+                'description' => 'Useful extras beyond requirements (auth, deployment, dashboards, etc.).',
+                'weight' => 0.1,
+                'group' => 'project',
+                'guide' => '1 = None, 2 = Very basic, 3 = Useful extras, 4 = Strong enhancements, 5 = Outstanding creativity'
+            ],
         ];
     }
 }
