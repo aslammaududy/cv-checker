@@ -7,6 +7,7 @@ use App\Models\User;
 use Gemini\Data\GenerationConfig;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
+use Gemini\Responses\GenerativeModel\GenerateContentResponse;
 use HelgeSverre\Milvus\Facades\Milvus;
 use Illuminate\Support\Facades\Log;
 use Spatie\PdfToText\Pdf;
@@ -16,6 +17,17 @@ class EvaluationService
     private string $cvText;
     private string $projectText;
     private User $user;
+
+    private array $jobdesc;
+    private array $rubricDataForCV;
+    private array $rubricDataForProject;
+    private array $filteredCv;
+    private array $filteredProject;
+    private array $promptCv;
+    private array $promptProject;
+    private GenerateContentResponse $cvScore;
+    private GenerateContentResponse $projectScore;
+    private GenerateContentResponse $refinedProjectScore;
 
     private Evaluation $evaluation;
 
@@ -40,14 +52,8 @@ class EvaluationService
         return $this;
     }
 
-    public function evaluate()
+    private function loadRubricScore(): static
     {
-        $this->ensureCollectionExists();
-
-        $this->embedCvAndProject();
-
-        $jobdesc = $this->findJobDescFromCV();
-
         $rubricCV = Milvus::vector()->query(
             collectionName: 'rubric',
             filter: "group == 'cv'",
@@ -60,20 +66,25 @@ class EvaluationService
             outputFields: ["category", "description", "weight", "vector", "guide"]
         );
 
-        $rubricDataForCV = $rubricCV->array('data');
-        $rubricDataForProject = $rubricProject->array('data');
+        $this->rubricDataForCV = $rubricCV->array('data');
+        $this->rubricDataForProject = $rubricProject->array('data');
+        return $this;
+    }
 
-        $filteredCv = $this->filterCVBasedOnRubricScore($rubricDataForCV);
-        $filteredProject = $this->filterProjectBasedOnRubricScore($rubricDataForProject);
-
-        $promptCv = $this->generatePromptForCVScoring($rubricDataForCV, $jobdesc, $filteredCv);
-        $promptProject = $this->generatePromptForProjectScoring($rubricDataForProject, $filteredProject);
-
-        $cvScore = $this->scoringCV($promptCv);
-        $projectScore = $this->scoringProject($promptProject);
-        $refinedProjectScore = $this->refineProjectScore($projectScore->json(), $rubricDataForProject);
-
-        $result = $this->generateResult($cvScore->json(), $refinedProjectScore->json());
+    public function evaluate()
+    {
+        $result = $this->ensureCollectionExists()
+            ->embedCvAndProject()
+            ->findJobDescFromCV()
+            ->loadRubricScore()
+            ->filterCVBasedOnRubricScore()
+            ->filterProjectBasedOnRubricScore()
+            ->generatePromptForCVScoring()
+            ->generatePromptForProjectScoring()
+            ->scoringCV()
+            ->scoringProject()
+            ->refineProjectScore()
+            ->generateResult();
 
         $this->evaluation->result = json_encode($result->json());
         $this->evaluation->status = 'completed';
@@ -144,6 +155,8 @@ class EvaluationService
         }
 
         $this->vectorize($cvEmbeddings, $projectEmbeddings);
+
+        return $this;
     }
 
     private function vectorize($cvEmbed, $projectEmbed)
@@ -171,7 +184,7 @@ class EvaluationService
         return array_filter(str_split($text, $chunkSize), fn($chunk) => !empty(trim($chunk)));
     }
 
-    private function ensureCollectionExists(): void
+    private function ensureCollectionExists(): static
     {
         try {
             // Check if collection exists first
@@ -189,9 +202,11 @@ class EvaluationService
             Log::error('Failed to ensure collection exists', ['error' => $e->getMessage()]);
             throw $e;
         }
+
+        return $this;
     }
 
-    private function findJobDescFromCV(): array
+    private function findJobDescFromCV(): static
     {
         $jobdesc = [];
 
@@ -214,13 +229,15 @@ class EvaluationService
             $jobdesc[] = array_column(array_slice($resjd->array('data'), 0, 3), 'description');
         }
 
-        return $jobdesc;
+        $this->jobdesc = $jobdesc;
+
+        return $this;
     }
 
-    private function filterCVBasedOnRubricScore(array $rubricData): array
+    private function filterCVBasedOnRubricScore(): static
     {
         $filteredCv = [];
-        foreach ($rubricData as $data) {
+        foreach ($this->rubricDataForCV as $data) {
             $cv = Milvus::vector()->search(
                 collectionName: 'cv',
                 vector: $data['vector'],
@@ -230,45 +247,51 @@ class EvaluationService
             $filteredCv[$data['category']] = array_slice($cv->array('data'), 0, 3);
         }
 
-        return $filteredCv;
+        $this->filteredCv = $filteredCv;
+
+        return $this;
     }
 
-    private function generatePromptForCVScoring(array $rubricData, array $jobdesc, array $filteredCv): array
+    private function generatePromptForCVScoring(): static
     {
-        return [
-            'jd_context' => $jobdesc,
-            'params' => array_map(function ($item) use ($filteredCv) {
+        $this->promptCv = [
+            'jd_context' => $this->jobdesc,
+            'params' => array_map(function ($item) {
                 return [
                     'parameter' => $item['category'],
                     'weight' => $item['weight'],
                     'rubric_desc' => $item['description'],
                     'guide' => $item['guide'],
-                    'cv_snippets' => array_map(fn($i) => $i['content'], $filteredCv[$item['category']]),
+                    'cv_snippets' => array_map(fn($i) => $i['content'], $this->filteredCv[$item['category']]),
                     'scale' => 'Score 1–5 using guide times weight'
                 ];
-            }, $rubricData)
+            }, $this->rubricDataForCV)
         ];
+
+        return $this;
     }
 
-    private function generatePromptForProjectScoring(mixed $rubricData, array $filteredProject): array
+    private function generatePromptForProjectScoring(): static
     {
-        return [
-            'params' => array_map(function ($item) use ($filteredProject) {
+        $this->promptProject = [
+            'params' => array_map(function ($item) {
                 return [
                     'parameter' => $item['category'],
                     'weight' => $item['weight'],
                     'rubric_desc' => $item['description'],
                     'guide' => $item['guide'],
-                    'project_snippets' => array_map(fn($i) => $i['content'], $filteredProject[$item['category']]),
-                    'scale' => 'Score 1–5 using guide times weight'
+                    'project_snippets' => array_map(fn($i) => $i['content'], $this->filteredProject[$item['category']]),
+                    'scale' => 'Score 1–5 using guide times weight. makes the scoring result as 10-point scale'
                 ];
-            }, $rubricData)
+            }, $this->rubricDataForProject)
         ];
+
+        return $this;
     }
 
-    private function scoringCV(array $prompt): \Gemini\Responses\GenerativeModel\GenerateContentResponse
+    private function scoringCV(): static
     {
-        return Gemini::generativeModel('gemini-2.5-flash')
+        $this->cvScore = Gemini::generativeModel('gemini-2.5-flash')
             ->withGenerationConfig(
                 new GenerationConfig(
                     temperature: 0.1,
@@ -290,13 +313,15 @@ class EvaluationService
                 cv_match_rate: your generated score times 0.2 and round it to 2 floating point.
                 For the cv_feedback replace {skill}, {experience}, {achievements}, {collaboration} with short and concise sentences.
                 " .
-                json_encode($prompt)
+                json_encode($this->promptCv)
             );
+
+        return $this;
     }
 
-    private function scoringProject(array $prompt): \Gemini\Responses\GenerativeModel\GenerateContentResponse
+    private function scoringProject(): static
     {
-        return Gemini::generativeModel('gemini-2.5-flash')
+        $this->projectScore = Gemini::generativeModel('gemini-2.5-flash')
             ->withGenerationConfig(
                 new GenerationConfig(
                     temperature: 0.1,
@@ -312,14 +337,16 @@ class EvaluationService
                 replace the curly braces with your answer.
                 For the project_feedback replace {feedback} with short and concise sentences.
                 " .
-                json_encode($prompt)
+                json_encode($this->promptProject)
             );
+
+        return $this;
     }
 
-    private function filterProjectBasedOnRubricScore(mixed $rubricData): array
+    private function filterProjectBasedOnRubricScore(): static
     {
         $filteredProject = [];
-        foreach ($rubricData as $data) {
+        foreach ($this->rubricDataForProject as $data) {
             $project = Milvus::vector()->search(
                 collectionName: 'project',
                 vector: $data['vector'],
@@ -329,24 +356,26 @@ class EvaluationService
             $filteredProject[$data['category']] = array_slice($project->array('data'), 0, 3);
         }
 
-        return $filteredProject;
+        $this->filteredProject = $filteredProject;
+
+        return $this;
     }
 
-    private function refineProjectScore(mixed $json, array $rubricData): \Gemini\Responses\GenerativeModel\GenerateContentResponse
+    private function refineProjectScore(): static
     {
         $refineScorePrompt = [
-            'params' => array_map(function ($item) use ($json) {
+            'params' => array_map(function ($item) {
                 return [
                     'parameter' => $item['category'],
                     'weight' => $item['weight'],
                     'rubric_desc' => $item['description'],
                     'guide' => $item['guide'],
-                    'initial_score' => $json->project_match_rate,
+                    'initial_score' => $this->projectScore->json()->project_match_rate,
                 ];
-            }, $rubricData)
+            }, $this->rubricDataForProject)
         ];
 
-        return Gemini::generativeModel('gemini-2.5-flash')
+        $this->refinedProjectScore = Gemini::generativeModel('gemini-2.5-flash')
             ->withGenerationConfig(
                 new GenerationConfig(
                     temperature: 0.1,
@@ -359,13 +388,15 @@ class EvaluationService
                     'project_match_rate': {rate},
                     'project_feedback': {feedback}
                 }
-                refine the initial score based on parameter, rubric_desc and guide also replace the curly braces with proper value
+                refine the initial score based on parameter, rubric_desc and guide also replace the curly braces with proper value and makes the scoring result as 10-point scale
                 " .
                 json_encode($refineScorePrompt)
             );
+
+        return $this;
     }
 
-    private function generateResult(mixed $jsonScore, mixed $jsonProject)
+    private function generateResult(): GenerateContentResponse
     {
         return Gemini::generativeModel('gemini-2.5-flash')
             ->withGenerationConfig(
@@ -390,7 +421,7 @@ class EvaluationService
                 }
                 Overall Summaryshould return 3–5 sentences (strengths, gaps, recommendations).
                 ' .
-                json_encode($jsonScore) . ' ' . json_encode($jsonProject)
+                json_encode($this->cvScore->json()) . ' ' . json_encode($this->refinedProjectScore)
             );
     }
 }
