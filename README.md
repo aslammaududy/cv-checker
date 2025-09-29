@@ -1,61 +1,163 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CV Checker
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+AI-assisted CV and project evaluator built with Laravel. It extracts text from PDF uploads, generates embeddings with Google Gemini, stores vectors in Milvus, retrieves rubric-aligned context, and produces concise, JSON-structured scoring and feedback.
 
-## About Laravel
+## Overview
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Core**: Laravel 12, Sanctum auth, queues for background evaluation
+- **AI**: `google-gemini-php/laravel` for embeddings and generation
+- **Vector DB**: Milvus via `helgesverre/milvus`
+- **PDF**: `spatie/pdf-to-text` to extract content
+- **Storage**: SQLite by default (simple local setup)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Features
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Upload PDFs**: CV and project as PDF (1MB max each)
+- **Embeddings**: Chunked text → Gemini embeddings (3072-d)
+- **Vector Search**: Similarity against rubric and job descriptions in Milvus
+- **Scoring**: Gemini produces JSON with match rates and actionable feedback
+- **Async Processing**: Queue-backed evaluation with status polling
 
-## Learning Laravel
+## Architecture
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **`app/Services/EvaluationService`**: End-to-end pipeline (extract → embed → retrieve → score → combine)
+- **Console commands**: Seed Milvus with rubric and job descriptions
+  - `php artisan rubric:load`
+  - `php artisan job-desc:load`
+- **HTTP endpoints**: Auth, upload, evaluate, and result retrieval
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Requirements
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- PHP 8.2+
+- Composer
+- Node 18+ (for Vite dev script)
+- Milvus (Docker)
+- Google Gemini API key
 
-## Laravel Sponsors
+## Quick Start
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+1) Install dependencies
+- `composer install`
+- `npm install`
 
-### Premium Partners
+2) Configure environment
+- Copy `.env.example` → `.env`
+- Set at least these variables:
+  - `APP_KEY` (run `php artisan key:generate` if empty)
+  - `GEMINI_API_KEY`
+  - `MILVUS_HOST`, `MILVUS_PORT`, `MILVUS_DATABASE`, `MILVUS_TOKEN` (optional)
+  - `QUEUE_CONNECTION=database` (recommended for background jobs)
+  - Database (SQLite recommended for local):
+    - `DB_CONNECTION=sqlite`
+    - Ensure `database/database.sqlite` exists (create empty file if missing)
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+3) Run database migrations
+- `php artisan migrate`
 
-## Contributing
+4) Configure And Start Milvus
+```bash
+#Download the installation script
+curl -sfL https://raw.githubusercontent.com/milvus-io/milvus/master/scripts/standalone_embed.sh -o standalone_embed.sh
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+#Start the Docker container
+bash standalone_embed.sh start
+```
 
-## Code of Conduct
+5) Seed vector database
+- `php artisan rubric:load`
+- `php artisan job-desc:load`
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+6) Run the app (dev mode)
+- One-shot dev script (serve, queue listener, logs, Vite):
+  - `composer dev`
+- Or run individually:
+  - `php artisan serve`
+  - `php artisan queue:listen --tries=1`
 
-## Security Vulnerabilities
+## Environment Variables
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- `GEMINI_API_KEY`: Google Gemini API key
+- `MILVUS_HOST`: Milvus host (default `localhost`)
+- `MILVUS_PORT`: Milvus port (default `19530`)
+- `MILVUS_TOKEN`: Milvus token (if enabled)
+- `MILVUS_DATABASE`: Milvus database (default `default`)
+- `MILVUS_DEFAULT_COLLECTION`: Default collection (not required for this flow)
+- `MILVUS_VECTOR_DIMENSION`: Default dimension (note: embeddings here are 3072)
+
+## Milvus Notes
+
+- Collections created/used: `cv`, `project`, `rubric`, `jobdesc`
+- Embedding dimension is 3072 for `cv`, `project`, `rubric`, `jobdesc` (Gemini embeddings)
+- Ensure Milvus is reachable from the app host and credentials match `.env`
+
+## HTTP API
+
+Base URL: `http://localhost:8000/api`
+
+Auth (Sanctum)
+- `POST /api/register` → `{ name, email, password, confirm_password }`
+- `POST /api/login` → `{ email, password }` → returns `token`
+- Use header: `Authorization: Bearer <token>` for all endpoints below
+
+Upload + Evaluate
+- `POST /api/upload`
+  - form-data: `cv` (PDF, ≤1MB), `project` (PDF, ≤1MB)
+- `POST /api/evaluate`
+  - queues an evaluation job, returns `{ id, status: "queued" }`
+- `GET /api/result/{id}`
+  - returns current status or final JSON result
+
+Examples (cURL)
+- Register:
+  - `curl -X POST http://localhost:8000/api/register \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Jane","email":"jane@example.com","password":"secret123","confirm_password":"secret123"}'`
+- Login:
+  - `curl -X POST http://localhost:8000/api/login \
+     -H "Content-Type: application/json" \
+     -d '{"email":"jane@example.com","password":"secret123"}'`
+- Upload:
+  - `curl -X POST http://localhost:8000/api/upload \
+     -H "Authorization: Bearer <TOKEN>" \
+     -F cv=@/path/to/cv.pdf \
+     -F project=@/path/to/project.pdf`
+- Evaluate:
+  - `curl -X POST http://localhost:8000/api/evaluate \
+     -H "Authorization: Bearer <TOKEN>"`
+- Result:
+  - `curl http://localhost:8000/api/result/<ID> \
+     -H "Authorization: Bearer <TOKEN>"`
+
+## Scoring Flow
+
+- **Extraction**: PDF → text via `spatie/pdf-to-text`
+- **Chunking**: Simple fixed-size chunking for embeddings
+- **Embedding**: Gemini `gemini-embedding-001` → 3072-d vectors
+- **Seeding**: `rubric:load` and `job-desc:load` populate Milvus with reference vectors
+- **Retrieval**:
+  - CV vectors → search similar job descriptions
+  - Rubric vectors → retrieve top-k CV and project snippets per category
+- **Generation**:
+  - Gemini `gemini-2.5-flash` produces CV score and project score JSON
+  - A refinement step adjusts project score to a 10-point scale
+  - Final JSON merges both into a single response
+
+## Files & Structure
+
+- `app/Services/EvaluationService.php`: Main pipeline and Gemini/Milvus integration
+- `app/Console/Commands/LoadRubricScoreCommand.php`: Seeds rubric
+- `app/Console/Commands/LoadJobDescCommand.php`: Seeds job descriptions
+- `app/Http/Controllers/*`: Auth, upload, evaluate, result endpoints
+- `config/milvus.php` and `config/gemini.php`: Configuration
+
+## Troubleshooting
+
+- **Empty PDF text**: Ensure your PDFs are text-based or install `pdftotext` backend for your OS
+- **Milvus connection**: Verify Docker container is running and ports are exposed (`19530`, `9091`)
+- **Dimension mismatch**: Ensure collections for embeddings use `3072` dim to match Gemini
+- **Queue not processing**: Start a worker (`php artisan queue:listen`) and set `QUEUE_CONNECTION`
+- **Auth issues**: Include `Authorization: Bearer <token>` on protected routes
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+MIT
