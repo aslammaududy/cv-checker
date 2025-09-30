@@ -72,7 +72,18 @@ bash standalone_embed.sh start
   - `composer dev`
 - Or run individually:
   - `php artisan serve`
-  - `php artisan queue:listen --tries=1`
+  - `php artisan queue:work`
+
+## Tests
+
+- Run all tests: `composer test` (wraps `php artisan test`)
+- Direct PHPUnit: `vendor/bin/phpunit`
+- Target suites: `php artisan test --testsuite=Unit` or `--testsuite=Feature`
+- Filter by name: `php artisan test --filter=ExampleTest`
+- Notes:
+  - Uses in-memory SQLite (`DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`)
+  - Queue runs `sync`, mailer is `array`, and app env is `testing`
+  - No Milvus or external services required; tests run fully isolated
 
 ## Environment Variables
 
