@@ -11,10 +11,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Register MilvusService as singleton
-        $this->app->singleton(\App\Services\MilvusService::class, function ($app) {
-            return new \App\Services\MilvusService();
-        });
+
     }
 
     /**
