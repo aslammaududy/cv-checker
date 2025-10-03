@@ -12,6 +12,15 @@ use Spatie\PdfToText\Pdf;
 
 class UploadController extends Controller
 {
+    /**
+     * Upload CV and project files
+     *
+     * Accepts PDF files for both CV and project documents.
+     * Files are stored and associated with the authenticated user.
+     * Maximum file size is 1MB per file.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function __invoke(Request $request)
     {
         $request->validate([

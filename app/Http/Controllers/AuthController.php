@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    /**
+     * Register a new user
+     *
+     * Creates a new user account with the provided credentials.
+     * Requires name, email, password, and password confirmation.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function register(Request $request)
     {
         request()->validate([
@@ -28,6 +36,14 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Login user
+     *
+     * Authenticates a user with email and password credentials.
+     * Returns a bearer token for subsequent API requests.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function login(Request $request)
     {
         request()->validate([

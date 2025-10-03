@@ -9,6 +9,15 @@ use Illuminate\Http\Request;
 
 class EvaluateController extends Controller
 {
+    /**
+     * Start CV and project evaluation
+     *
+     * Initiates the evaluation process for the user's uploaded CV and project files.
+     * The evaluation is processed asynchronously in a queue.
+     * Returns an evaluation ID and status for tracking.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function evaluate(EvaluationService $service)
     {
         $evaluation = Evaluation::where('user_id', request()->user()->id)->firstOrFail();
@@ -30,6 +39,16 @@ class EvaluateController extends Controller
         ]);
     }
 
+    /**
+     * Get evaluation results
+     *
+     * Retrieves the evaluation results for a specific evaluation ID.
+     * Returns the evaluation status and results if processing is complete.
+     * Possible statuses: queued, processing, complete, or failed.
+     *
+     * @param int $id The evaluation ID
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function result(int $id)
     {
         $evaluation = Evaluation::where('id', $id)->first();
